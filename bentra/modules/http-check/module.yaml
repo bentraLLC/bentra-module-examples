@@ -1,0 +1,60 @@
+apiVersion: bentra/v1
+kind: Module
+metadata:
+  name: http-check
+  display_name: HTTP check
+  description: Check that URLs answer with the status you expect.
+  category: monitoring
+  icon: activity
+runtime:
+  language: python
+  version: ">=3.11"
+dependencies:
+  file: requirements.txt
+connection:
+  required: false            # steps may omit the connection for public URLs
+  fields:
+    token:
+      type: string
+      secret: true
+      title: Bearer token
+      description: 'Sent as "Authorization: Bearer <token>" when set.'
+    timeout_seconds:
+      type: number
+      default: 30
+defaults:
+  timeout_seconds: 120
+actions:
+  - name: check_url
+    description: Request one URL and report its status and response time.
+    entrypoint: actions/check_url.py
+    inputs:
+      type: object
+      properties:
+        url: {type: string, description: "The URL to request."}
+        expected_status: {type: integer, default: 200}
+      required: [url]
+      additionalProperties: false
+    outputs:
+      type: object
+      properties:
+        status: {type: integer}
+        ok: {type: boolean}
+        elapsed_ms: {type: integer}
+      required: [status, ok, elapsed_ms]
+  - name: check_many
+    description: Request several URLs and report which ones failed.
+    entrypoint: actions/check_many.py
+    inputs:
+      type: object
+      properties:
+        urls: {type: array, items: {type: string}, minItems: 1}
+        expected_status: {type: integer, default: 200}
+      required: [urls]
+      additionalProperties: false
+    outputs:
+      type: object
+      properties:
+        checked: {type: integer}
+        failed: {type: array, items: {type: string}}
+      required: [checked, failed]

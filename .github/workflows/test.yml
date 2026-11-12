@@ -1,0 +1,40 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  actions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.6"   # the version the committed binaries were built with
+      - run: pip install pyyaml
+      - name: Run every action with its sample inputs
+        run: |
+          set -euo pipefail
+          for inputs in bentra/modules/*/tests/*.json; do
+            module=$(dirname "$(dirname "$inputs")")
+            action=$(basename "$inputs" .json)
+            echo "::group::$module $action"
+            scripts/run-action.sh "$module" "$action" "$inputs"
+            echo "::endgroup::"
+          done
+      - name: Binaries match their source
+        working-directory: bentra/modules/sha-tool
+        run: |
+          go version
+          make -B build
+          git diff --exit-code -- bin/

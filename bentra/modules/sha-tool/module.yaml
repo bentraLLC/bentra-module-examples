@@ -1,0 +1,27 @@
+apiVersion: bentra/v1
+kind: Module
+metadata:
+  name: sha-tool
+  display_name: SHA tool
+  description: Hash text with SHA-256. A prebuilt Go binary, shipped for each runner platform.
+  category: security
+  icon: hash
+runtime:
+  language: binary
+  platforms: [linux-amd64, linux-arm64]   # the runner runs bin/<platform>/<entrypoint>
+actions:
+  - name: sha256
+    description: SHA-256 of a text, as hex.
+    entrypoint: sha-tool                  # bin/linux-amd64/sha-tool, bin/linux-arm64/sha-tool
+    inputs:
+      type: object
+      properties:
+        text: {type: string}
+      required: [text]
+      additionalProperties: false
+    outputs:
+      type: object
+      properties:
+        sha256: {type: string, pattern: "^[0-9a-f]{64}$"}
+        bytes: {type: integer}
+      required: [sha256, bytes]

@@ -1,0 +1,47 @@
+# A job that chains three example modules. Register the workflow with the working directory
+# bentra/workflows/module-demo; register each module with its own folder under bentra/modules/.
+name: Module demo
+steps:
+  - id: name
+    name: Make a slug
+    module:
+      name: text-tools
+      version: "1.0.0"                 # exact and quoted: a workflow pins one version
+      action: slugify
+      inputs:
+        text: Payments API (EU West)
+
+  - id: config
+    name: Build the config
+    module:
+      name: json-tools
+      version: "1.0.0"
+      action: merge
+      inputs:
+        base: {env: dev, region: eu-west-1}
+        overlay:
+          service: ${{ steps.name.outputs.slug }}   # an earlier step's output keeps its type
+
+  - id: hash
+    name: Hash the service name
+    module:
+      name: sha-tool
+      version: "1.0.0"
+      action: sha256
+      inputs:
+        text: ${{ steps.name.outputs.slug }}
+
+  - id: check
+    name: Check the endpoint
+    module:
+      name: http-check
+      version: "1.0.0"
+      action: check_url
+      inputs:
+        url: https://example.com
+
+  - name: Report
+    run: |
+      # Script steps read every earlier module step's outputs from one JSON file.
+      jq '{service: .config.result.service, sha256: .hash.sha256, status: .check.status}' \
+        "$BENTRA_STEP_OUTPUTS"

@@ -1,0 +1,42 @@
+apiVersion: bentra/v1
+kind: Module
+metadata:
+  name: json-tools
+  display_name: JSON tools
+  description: Merge JSON objects and pick fields out of them. Bash and jq, no credentials.
+  category: other
+  icon: braces
+runtime:
+  language: bash               # no connection block: this module needs no credentials
+actions:
+  - name: merge
+    description: Deep-merge two JSON objects; values in overlay win.
+    entrypoint: actions/merge.sh
+    inputs:
+      type: object
+      properties:
+        base: {type: object}
+        overlay: {type: object}
+      required: [base, overlay]
+      additionalProperties: false
+    outputs:
+      type: object
+      properties:
+        result: {type: object}
+      required: [result]
+  - name: pick
+    description: Keep only the listed top-level keys of a JSON object.
+    entrypoint: actions/pick.sh
+    inputs:
+      type: object
+      properties:
+        object: {type: object}
+        keys: {type: array, items: {type: string}, minItems: 1}
+      required: [object, keys]
+      additionalProperties: false
+    outputs:
+      type: object
+      properties:
+        result: {type: object}
+        missing: {type: array, items: {type: string}}
+      required: [result, missing]

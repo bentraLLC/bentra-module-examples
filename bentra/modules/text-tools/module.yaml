@@ -1,0 +1,29 @@
+apiVersion: bentra/v1
+kind: Module
+metadata:
+  name: text-tools
+  display_name: Text tools
+  description: Turn names into URL- and resource-safe slugs. Node.js with an npm dependency.
+  category: other
+  icon: type
+runtime:
+  language: node
+  version: ">=20"
+dependencies:
+  file: package.json           # package-lock.json must sit next to it (npm ci)
+actions:
+  - name: slugify
+    description: Turn text into a lowercase slug, e.g. for bucket or namespace names.
+    entrypoint: actions/slugify.js
+    inputs:
+      type: object
+      properties:
+        text: {type: string, minLength: 1}
+        max_length: {type: integer, minimum: 1, default: 63}
+      required: [text]
+      additionalProperties: false
+    outputs:
+      type: object
+      properties:
+        slug: {type: string}
+      required: [slug]
