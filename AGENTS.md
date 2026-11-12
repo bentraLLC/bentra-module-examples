@@ -17,17 +17,21 @@ private registry, and is released as immutable versions that workflows pin exact
 2. **One folder per module**, holding `module.yaml` (or `module.yml`, never both). Put modules
    under `bentra/modules/<name>/`; `<name>` should equal `metadata.name`.
 3. **`module.yaml` is the only source of the module's details**: name, display name,
-   description, category, icon. There is no version in it: the version is chosen when
-   publishing (strict semver, `MAJOR.MINOR.PATCH`).
-4. **Keys are snake_case. Unknown keys are rejected**, except ones starting with `x-`.
+   description, category, icon, and its **version**.
+4. **The version lives in module.yaml** (`version: 1.2.0`, strict semver: `MAJOR.MINOR.PATCH`
+   or a pre-release like `1.3.0-rc.1`, no `v`). Bentra releases every version it sees on the
+   tracked branch or tag that it hasn't released yet. **Bumping `version` and pushing is
+   releasing**: confirm the new number with the user before you commit it. Changing files
+   without bumping it releases nothing (Bentra shows a `version_not_bumped` warning).
+5. **Keys are snake_case. Unknown keys are rejected**, except ones starting with `x-`.
    The exact schema, with descriptions and an example, is `bentra://schemas/module` (Bentra MCP
    server) or `GET /orgs/<org>/api/v1/schemas/module/`.
-5. **Never put credentials in a module.** Declare them under `connection.fields` (mark tokens and
+6. **Never put credentials in a module.** Declare them under `connection.fields` (mark tokens and
    passwords `secret: true`); people enter the values in Bentra and the action reads them from
    `$BENTRA_CONNECTION_FILE` at run time.
-6. **Pin dependencies exactly** (`requests==2.32.5`, a committed `package-lock.json`).
-7. **A published version never changes.** Removing an action, renaming an input or adding a
-   required input is a breaking change: it needs a new major version.
+7. **Pin dependencies exactly** (`requests==2.32.5`, a committed `package-lock.json`).
+8. **A released version never changes.** Removing an action, renaming an input or adding a
+   required input is a breaking change: bump the major version.
 
 ## Layout
 
@@ -55,6 +59,8 @@ A repository whose root is a single module works too (working directory `""`).
 ```yaml
 apiVersion: bentra/v1
 kind: Module
+version: 1.0.0                      # bump to release; strict semver, no "v"
+release_notes: First release        # optional, stored with the release
 metadata:
   name: http-check                  # lowercase, digits, hyphens; what workflows reference
   display_name: HTTP check
@@ -165,7 +171,7 @@ steps:
 `${{ }}` expressions work only inside `module.inputs`. A value that is exactly one expression
 keeps its JSON type.
 
-## Checklist before publishing
+## Checklist before releasing
 
 - [ ] `module.yaml` validates against the schema; `metadata.name` matches the folder name.
 - [ ] Every `entrypoint` exists inside the working directory; binaries for every platform.
@@ -176,15 +182,17 @@ keeps its JSON type.
 - [ ] Nothing secret in the repository or in logs.
 - [ ] `scripts/run-action.sh <module dir> <action> <inputs.json>` succeeds for every action.
 - [ ] `README.md` says what each action does, its inputs and outputs, and the connection.
+- [ ] `version` is bumped (MAJOR for breaking changes) and the user agreed to the number.
 
-## Registering and publishing (Bentra MCP tools)
+## Registering and releasing (Bentra MCP tools)
 
 1. `inspect_module_source` with the connector, repository, branch and working directory: shows
    the manifest, actions, README and `issues` (file, line, message, hint). Fix and repeat.
-2. `register_module` with the same source. Registering publishes nothing.
-3. After each push: `refresh_module`, then `validate_module` (the full publish checks, no
-   release) and poll `get_module_publication`.
-4. Ask the user for the version, then `publish_module_version` with `expected_sha` set to the
-   commit you validated. Poll `get_module_publication` until `published`.
+2. `register_module` with the same source. Registering releases the `version` in module.yaml.
+3. To release again: bump `version`, push, then `refresh_module` (or wait for the push). Poll
+   `list_module_publications` until the newest is `published` (or `failed` with `issues`).
+   `validate_module` runs every release check without releasing.
+4. `set_active_module_version` chooses the version new workflow steps use (omit `version` to
+   follow the newest release). Workflows keep the exact version they pin.
 5. Create a connection with `create_module_connection` (non-secret fields only; the user enters
    secrets in Bentra), then reference the module from `workflow.yml`.

@@ -44,11 +44,12 @@ scripts/run-action.sh bentra/modules/json-tools merge bentra/modules/json-tools/
 
 1. **Modules → Register module**: choose your connection, this repository, `main`, and a working
    directory such as `bentra/modules/http-check`.
-2. Review the module, its actions and README, then register it and publish a version.
+2. Review the module, its actions and README, then register it: Bentra releases the `version`
+   in its module.yaml. To release again, bump `version` and push.
 3. Reference it from a workflow step (see `bentra/workflows/module-demo/workflow.yml`).
 
 ## Building modules with an agent
 
 Give your coding agent [`AGENTS.md`](AGENTS.md): the layout, the `module.yaml` rules, the action
 contract and a checklist. With the Bentra MCP server connected, the agent can also inspect,
-register, validate and publish modules for you.
+register, validate and release modules for you.

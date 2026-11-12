@@ -1,5 +1,6 @@
 apiVersion: bentra/v1
 kind: Module
+version: 1.0.0             # bump to release a new version (strict semver)
 metadata:
   name: http-check
   display_name: HTTP check
