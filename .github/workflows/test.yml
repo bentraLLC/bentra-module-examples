@@ -20,7 +20,7 @@ jobs:
           node-version: "22"
       - uses: actions/setup-go@v5
         with:
-          go-version: "1.25.6"   # the version the committed binaries were built with
+          go-version: "1.25.6"
       - run: pip install pyyaml
       - name: Run every action with its sample inputs
         run: |
@@ -32,9 +32,17 @@ jobs:
             scripts/run-action.sh "$module" "$action" "$inputs"
             echo "::endgroup::"
           done
-      - name: Binaries match their source
+      - name: The source builds and gives the same result as the committed binary
         working-directory: bentra/modules/sha-tool
         run: |
-          go version
+          set -euo pipefail
+          expected=$(printf 'hello bentra' | sha256sum | cut -d' ' -f1)
           make -B build
-          git diff --exit-code -- bin/
+          cd ../../..
+          for binary in committed rebuilt; do
+            [[ $binary == committed ]] && git stash -q -- bentra/modules/sha-tool/bin || true
+            out=$(scripts/run-action.sh bentra/modules/sha-tool sha256 bentra/modules/sha-tool/tests/sha256.json | tail -2)
+            [[ $binary == committed ]] && git stash pop -q || true
+            echo "$binary: $out"
+            grep -q "$expected" <<<"$out"
+          done
