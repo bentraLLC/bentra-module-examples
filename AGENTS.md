@@ -26,9 +26,10 @@ private registry, and is released as immutable versions that workflows pin exact
 5. **Keys are snake_case. Unknown keys are rejected**, except ones starting with `x-`.
    The exact schema, with descriptions and an example, is `bentra://schemas/module` (Bentra MCP
    server) or `GET /orgs/<org>/api/v1/schemas/module/`.
-6. **Never put credentials in a module.** Declare them under `connection.fields` (mark tokens and
-   passwords `secret: true`); people enter the values in Bentra and the action reads them from
-   `$BENTRA_CONNECTION_FILE` at run time.
+6. **Never put credentials in a module.** Declare the auth it accepts under `auth.methods`; the
+   workflow step calling the module passes the values in `module.auth` (secrets from
+   `${{ vars.NAME }}` or `${{ inputs.field }}`), and the action reads them from
+   `$BENTRA_AUTH_FILE` at run time.
 7. **Pin dependencies exactly** (`requests==2.32.5`, a committed `package-lock.json`).
 8. **A released version never changes.** Removing an action, renaming an input or adding a
    required input is a breaking change: bump the major version.
@@ -73,11 +74,16 @@ runtime:
   version: ">=3.11"                 # required for python and node
 dependencies:
   file: requirements.txt            # optional
-connection:                         # optional; omit when no credentials are needed
-  required: false                   # false: steps may run without a connection
-  fields:
-    token: {type: string, secret: true, title: Bearer token}
-    timeout_seconds: {type: number, default: 30}
+auth:                               # optional; omit when no credentials are needed
+  required: false                   # false: steps may call it without auth
+  methods:                          # the calling step picks one with auth.type
+    - type: token                   # token | basic | api_key | oauth2_client_credentials
+      description: Bearer token with read access.
+    - type: custom                  # your own fields
+      name: signed
+      fields:
+        key_id: {type: string, required: true}
+        private_key: {type: string, secret: true, required: true}
 defaults:
   timeout_seconds: 120
 actions:
@@ -111,7 +117,7 @@ variables:
 |---|---|
 | `BENTRA_INPUT_FILE` | JSON object: the step's inputs, already checked against `inputs` |
 | `BENTRA_OUTPUT_FILE` | Write **one JSON object** here (at most 1 MB), matching `outputs` |
-| `BENTRA_CONNECTION_FILE` | JSON object of the connection's fields. **Only set when the step names a connection**: handle it missing when `connection.required` is false |
+| `BENTRA_AUTH_FILE` | `{"type": <method>, <field>: value}` from the step's `module.auth`. **Only set when the step passes auth**: handle it missing when `auth.required` is false. Built-in fields: token `token`; basic `username`, `password`; api_key `key`; oauth2_client_credentials `client_id`, `client_secret`, `token_url`, `scope` |
 | `BENTRA_CONTEXT_FILE` | `{run_id, job_id, workflow_id, step: {id, name, index}, module: {name, version, action}}` |
 | `BENTRA_STEP_OUTPUTS` | JSON object of earlier steps' outputs, keyed by step `id` |
 | `BENTRA_MODULE_DIR` | The module's files (read only) |
@@ -119,7 +125,7 @@ variables:
 
 - **Exit 0 is success**; any other exit code fails the step. On failure you may write
   `{"error": {"code": "...", "message": "...", "details": {...}}}` to the output file.
-- **stdout and stderr are the step's log.** Never print connection values; secret values and
+- **stdout and stderr are the step's log.** Never print auth values; secret values and
   outputs marked `x-bentra-secret: true` are masked anyway.
 - **The environment is an allowlist**: only `PATH`, locale, `TZ`, proxy and CA variables come
   through. Workflow variables and secrets reach an action only as inputs.
@@ -140,9 +146,9 @@ variables:
 import json, os, sys
 
 inputs = json.load(open(os.environ["BENTRA_INPUT_FILE"]))
-connection = {}
-if os.environ.get("BENTRA_CONNECTION_FILE"):
-    connection = json.load(open(os.environ["BENTRA_CONNECTION_FILE"]))
+auth = {}
+if os.environ.get("BENTRA_AUTH_FILE"):
+    auth = json.load(open(os.environ["BENTRA_AUTH_FILE"]))
 
 result = {"greeting": f"Hello, {inputs['name']}"}
 print(result["greeting"])                      # the step log
@@ -159,16 +165,19 @@ steps:
     name: Check the API
     module:
       name: http-check
-      version: "1.0.0"              # exact and quoted
+      version: "2.0.0"              # exact and quoted
       action: check_url
-      connection: monitoring-token  # a module connection shared with the workspace
+      auth:                         # one of the module's auth methods
+        type: token
+        token: ${{ vars.MONITORING_TOKEN }}   # secrets: vars./inputs. only, never the value
       inputs:
         url: ${{ inputs.api_url }}  # form field; also steps.<id>.outputs.<key>, vars.<NAME>
   - name: Report
     run: jq '.check.status' "$BENTRA_STEP_OUTPUTS"
 ```
 
-`${{ }}` expressions work only inside `module.inputs`. A value that is exactly one expression
+`${{ }}` expressions work only inside `module.inputs` and `module.auth` (auth: `inputs.` and
+`vars.` only). A value that is exactly one expression
 keeps its JSON type.
 
 ## Checklist before releasing
@@ -178,10 +187,10 @@ keeps its JSON type.
 - [ ] Dependencies are pinned (`requirements.txt` with `==`, committed `package-lock.json`).
 - [ ] Each action reads only its env files, writes one JSON object matching `outputs`, and
       exits non-zero on failure.
-- [ ] Optional connections are handled when `BENTRA_CONNECTION_FILE` is unset.
+- [ ] Optional auth is handled when `BENTRA_AUTH_FILE` is unset.
 - [ ] Nothing secret in the repository or in logs.
 - [ ] `scripts/run-action.sh <module dir> <action> <inputs.json>` succeeds for every action.
-- [ ] `README.md` says what each action does, its inputs and outputs, and the connection.
+- [ ] `README.md` says what each action does, its inputs and outputs, and its auth.
 - [ ] `version` is bumped (MAJOR for breaking changes) and the user agreed to the number.
 
 ## Registering and releasing (Bentra MCP tools)
@@ -194,5 +203,5 @@ keeps its JSON type.
    `validate_module` runs every release check without releasing.
 4. `set_active_module_version` chooses the version new workflow steps use (omit `version` to
    follow the newest release). Workflows keep the exact version they pin.
-5. Create a connection with `create_module_connection` (non-secret fields only; the user enters
-   secrets in Bentra), then reference the module from `workflow.yml`.
+5. Reference the module from `workflow.yml`, passing `module.auth` when it declares auth. Ask the
+   user to add the secret variables in Bentra; never set their values yourself.

@@ -1,4 +1,4 @@
-"""Helpers for the Bentra action contract: read inputs, connection and context, write outputs."""
+"""Helpers for the Bentra action contract: read inputs, auth and context, write outputs."""
 import json
 import os
 import sys
@@ -16,9 +16,9 @@ def inputs() -> dict:
     return _load("BENTRA_INPUT_FILE")
 
 
-def connection() -> dict:
-    """The step's connection fields; {} when the step names no connection."""
-    return _load("BENTRA_CONNECTION_FILE")
+def auth() -> dict:
+    """The step's auth, {"type": ..., <fields>}; {} when the step passes none."""
+    return _load("BENTRA_AUTH_FILE")
 
 
 def context() -> dict:

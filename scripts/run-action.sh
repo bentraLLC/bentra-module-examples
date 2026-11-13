@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Run one module action locally the way a Bentra runner does.
 #
-#   scripts/run-action.sh <module dir> <action> <inputs.json> [connection.json]
+#   scripts/run-action.sh <module dir> <action> <inputs.json> [auth.json]
+#   auth.json is what the step's module.auth resolves to, e.g. {"type": "token", "token": "..."}
 #   scripts/run-action.sh bentra/modules/json-tools merge bentra/modules/json-tools/tests/merge.json
 #
 # Needs: bash, jq, python3 with PyYAML (pip install pyyaml; or set PYTHON=<interpreter>), node + npm (node modules). Binary modules run
@@ -9,7 +10,7 @@
 set -euo pipefail
 
 module_dir=$(cd "$1" && pwd); action=$2; inputs=$(cd "$(dirname "$3")" && pwd)/$(basename "$3")
-connection=${4:+$(cd "$(dirname "$4")" && pwd)/$(basename "$4")}
+auth=${4:+$(cd "$(dirname "$4")" && pwd)/$(basename "$4")}
 manifest="$module_dir/module.yaml"; [[ -f "$manifest" ]] || manifest="$module_dir/module.yml"
 
 yaml() { "${PYTHON:-python3}" -c 'import json,sys,yaml; print(json.dumps(yaml.safe_load(open(sys.argv[1]))))' "$manifest"; }
@@ -53,7 +54,7 @@ env -i PATH="$PATH" HOME="$scratch" TMPDIR="$scratch/tmp" ${NODE_PATH:+NODE_PATH
   BENTRA_INPUT_FILE="$inputs" BENTRA_OUTPUT_FILE="$scratch/output.json" \
   BENTRA_CONTEXT_FILE="$scratch/context.json" BENTRA_STEP_OUTPUTS="$scratch/steps.json" \
   BENTRA_MODULE_DIR="$module_dir" BENTRA_TEMP_DIR="$scratch/tmp" \
-  ${connection:+BENTRA_CONNECTION_FILE="$connection"} \
+  ${auth:+BENTRA_AUTH_FILE="$auth"} \
   "${runner[@]}" "$module_dir/$entrypoint" && status=0 || status=$?
 
 echo "--- outputs (exit $status)"

@@ -6,12 +6,12 @@ import requests
 import _bentra
 
 
-def session() -> tuple[requests.Session, float]:
-    conn = _bentra.connection()
+def session(params: dict) -> tuple[requests.Session, float]:
+    auth = _bentra.auth()
     s = requests.Session()
-    if conn.get("token"):
-        s.headers["Authorization"] = f"Bearer {conn['token']}"
-    return s, float(conn.get("timeout_seconds") or 30)
+    if auth.get("type") == "token":
+        s.headers["Authorization"] = f"Bearer {auth['token']}"
+    return s, float(params.get("timeout_seconds") or 30)
 
 
 def check(s: requests.Session, url: str, timeout: float) -> tuple[int, int]:
@@ -27,7 +27,7 @@ def check(s: requests.Session, url: str, timeout: float) -> tuple[int, int]:
 def main() -> None:
     params = _bentra.inputs()
     expected = params.get("expected_status", 200)
-    s, timeout = session()
+    s, timeout = session(params)
     status, elapsed_ms = check(s, params["url"], timeout)
     ok = status == expected
     print(f"{params['url']} answered {status} in {elapsed_ms} ms (expected {expected})")

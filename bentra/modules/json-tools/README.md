@@ -1,7 +1,7 @@
 # JSON tools
 
 Merge JSON objects and pick fields out of them. Bash and `jq` (both on every Bentra runner);
-no dependencies and no connection.
+no dependencies and no auth.
 
 | Action | Inputs | Outputs |
 |---|---|---|

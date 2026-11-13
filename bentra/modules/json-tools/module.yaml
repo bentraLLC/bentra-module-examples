@@ -8,7 +8,7 @@ metadata:
   category: other
   icon: braces
 runtime:
-  language: bash               # no connection block: this module needs no credentials
+  language: bash               # no auth block: this module needs no credentials
 actions:
   - name: merge
     description: Deep-merge two JSON objects; values in overlay win.

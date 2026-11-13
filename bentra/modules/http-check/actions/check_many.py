@@ -6,7 +6,7 @@ from check_url import check, session
 def main() -> None:
     params = _bentra.inputs()
     expected = params.get("expected_status", 200)
-    s, timeout = session()
+    s, timeout = session(params)
     failed = []
     for url in params["urls"]:
         status, elapsed_ms = check(s, url, timeout)
