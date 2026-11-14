@@ -35,7 +35,7 @@ steps:
     name: Check the endpoint
     module:
       name: http-check
-      version: "1.0.0"
+      version: "2.0.0"
       action: check_url
       inputs:
         url: https://example.com
