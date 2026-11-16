@@ -5,7 +5,8 @@
 #   auth.json is what the step's module.auth resolves to, e.g. {"type": "token", "token": "..."}
 #   scripts/run-action.sh bentra/modules/json-tools merge bentra/modules/json-tools/tests/merge.json
 #
-# Needs: bash, jq, python3 with PyYAML (pip install pyyaml; or set PYTHON=<interpreter>), node + npm (node modules). Binary modules run
+# Needs: bash, jq, python3 with PyYAML (pip install pyyaml; or set PYTHON=<interpreter>), node + npm (node modules), uv for a
+# module whose setup script calls it. Binary modules run
 # only on a matching linux platform. Prints the action's log, then its outputs.
 set -euo pipefail
 
@@ -19,6 +20,7 @@ language=$(jq -r '.runtime.language' <<<"$spec")
 entrypoint=$(jq -r --arg a "$action" '.actions[] | select(.name == $a) | .entrypoint' <<<"$spec")
 [[ -n "$entrypoint" ]] || { echo "no action '$action' in $manifest" >&2; exit 2; }
 deps=$(jq -r '.dependencies.file // empty' <<<"$spec")
+setup=$(jq -r '.setup // empty' <<<"$spec")
 
 scratch=$(mktemp -d); trap 'rm -rf "$scratch"' EXIT
 mkdir -p "$scratch/tmp"
@@ -31,8 +33,9 @@ jq -n --arg m "$(jq -r .metadata.name <<<"$spec")" --arg a "$action" \
 runner=()
 case "$language" in
   python)
-    if [[ -n "$deps" ]]; then
-      python3 -m venv "$scratch/env" && "$scratch/env/bin/pip" install -q -r "$module_dir/$deps"
+    if [[ -n "$deps" || -n "$setup" ]]; then
+      python3 -m venv "$scratch/env"
+      [[ -z "$deps" ]] || "$scratch/env/bin/pip" install -q -r "$module_dir/$deps"
       runner=("$scratch/env/bin/python")
     else runner=(python3); fi ;;
   node)
@@ -50,7 +53,16 @@ case "$language" in
     [[ -x "$module_dir/$entrypoint" ]] || { echo "no binary for $os-$arch: $entrypoint" >&2; exit 2; } ;;
 esac
 
-env -i PATH="$PATH" HOME="$scratch" TMPDIR="$scratch/tmp" ${NODE_PATH:+NODE_PATH="$NODE_PATH"} \
+# The setup script runs once per environment on a runner; here, once per call.
+mkdir -p "$scratch/env/bin"
+env_path="$scratch/env/bin"
+if [[ -n "$setup" ]]; then
+  (cd "$module_dir" && PATH="$env_path:$PATH" VIRTUAL_ENV="$scratch/env" \
+    BENTRA_ENV_DIR="$scratch/env" BENTRA_MODULE_DIR="$module_dir" \
+    bash --noprofile --norc -eo pipefail -c "$setup") >&2
+fi
+
+env -i PATH="$env_path:$PATH" HOME="$scratch" TMPDIR="$scratch/tmp" ${NODE_PATH:+NODE_PATH="$NODE_PATH"} \
   BENTRA_INPUT_FILE="$inputs" BENTRA_OUTPUT_FILE="$scratch/output.json" \
   BENTRA_CONTEXT_FILE="$scratch/context.json" BENTRA_STEP_OUTPUTS="$scratch/steps.json" \
   BENTRA_MODULE_DIR="$module_dir" BENTRA_TEMP_DIR="$scratch/tmp" \

@@ -74,6 +74,9 @@ runtime:
   version: ">=3.11"                 # required for python and node
 dependencies:
   file: requirements.txt            # optional
+  env: [UV_INDEX_URL]               # optional: workflow variables the install and setup get
+setup: |                            # optional: bash, run once when the environment is built
+  uv pip install example-cli==1.2.3
 auth:                               # optional; omit when no credentials are needed
   required: false                   # false: steps may call it without auth
   methods:                          # the calling step picks one with auth.type
@@ -135,7 +138,7 @@ variables:
 
 | `language` | How the runner starts the entrypoint | Dependencies |
 |---|---|---|
-| `python` | `python <entrypoint>` in a virtualenv per module version (runner image: Python 3.12) | `dependencies.file: requirements.txt`, pinned |
+| `python` | `python <entrypoint>` in the module version's own environment. The runner installs `runtime.version` with uv when its image (Python 3.12 to 3.14) has no match | `dependencies.file: requirements.txt`, pinned, installed with `uv pip install -r` |
 | `node` | `node <entrypoint>` (Node 22). **CommonJS only**: `.js`/`.cjs` with `require`; `import` can't see the installed packages | `dependencies.file: package.json` + committed `package-lock.json`; installed with `npm ci --omit=dev` |
 | `bash` | `bash <entrypoint>`. Start with `set -euo pipefail`; use `jq` (installed) for JSON | none |
 | `binary` | `bin/<os>-<arch>/<entrypoint>`, e.g. `bin/linux-amd64/sha-tool`. List each in `runtime.platforms` and commit the binaries | none (static binaries) |
@@ -179,6 +182,25 @@ steps:
 `${{ }}` expressions work only inside `module.inputs` and `module.auth` (auth: `inputs.` and
 `vars.` only). A value that is exactly one expression
 keeps its JSON type.
+
+## Environment: `setup` and `dependencies.env`
+
+The runner builds a module version's environment the first time a job uses it and reuses it
+afterwards. Nothing is installed when a version is released.
+
+- `setup` is a bash script (`bash -eo pipefail`) run once, after the dependency install, in
+  the module's folder with the environment active. Use it for what a dependency file can't
+  express: a command-line tool, an extra package. What it installs into the environment is on
+  the action's `PATH`. Every runtime can have one. It does not run on every call, so never
+  put per-call work in it.
+- `dependencies.env` lists the names (capitals) of the calling workflow's variables and
+  secrets that the install and `setup` receive, for a private package index. They get nothing
+  else from the run, and actions never receive these.
+- Pass credentials to installers through those environment variables only. A build that
+  writes one into the environment's files is refused.
+- To change dependencies or `setup`, bump `version`: a released version never changes.
+
+`bentra/modules/yaml-lint` is the example.
 
 ## Checklist before releasing
 

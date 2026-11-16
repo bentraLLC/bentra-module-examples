@@ -8,6 +8,7 @@ Bentra expects, plus a workflow that chains them. Copy a folder to start your ow
 | [`http-check`](bentra/modules/http-check) | Python + `requests` | pinned dependencies, optional token auth passed in by the calling step, two actions sharing a helper, structured errors |
 | [`json-tools`](bentra/modules/json-tools) | Bash + `jq` | no dependencies, no auth, object inputs and outputs |
 | [`text-tools`](bentra/modules/text-tools) | Node.js + `slugify` | `package.json` + `package-lock.json`, CommonJS |
+| [`yaml-lint`](bentra/modules/yaml-lint) | Python + a command-line tool | a `setup` script that installs a tool into the module's environment, `dependencies.env` for a private package index |
 | [`sha-tool`](bentra/modules/sha-tool) | Go, prebuilt binary | `runtime.platforms`, `bin/<os>-<arch>/`, rebuilding with `make` |
 
 [`bentra/workflows/module-demo`](bentra/workflows/module-demo/workflow.yml) calls all four and
@@ -36,7 +37,7 @@ self-contained.
 ## Try an action locally
 
 ```bash
-pip install pyyaml        # the harness reads module.yaml with it
+pip install pyyaml uv     # the harness reads module.yaml with it; uv is for setup scripts
 scripts/run-action.sh bentra/modules/json-tools merge bentra/modules/json-tools/tests/merge.json
 ```
 

@@ -1,0 +1,39 @@
+apiVersion: bentra/v1
+kind: Module
+version: 1.0.0             # bump to release a new version (strict semver)
+metadata:
+  name: yaml-lint
+  display_name: YAML lint
+  description: Check YAML text with yamllint and report each problem.
+  category: other
+  icon: file-check
+runtime:
+  language: python
+  version: "3.13"          # the runner installs it with uv if its image has no 3.13
+dependencies:
+  # Variables of the calling workflow that the install and setup receive, and nothing else:
+  # set UV_INDEX_URL on the workflow to install from a private index. Unset is fine.
+  env: [UV_INDEX_URL]
+# Runs once, when the runner builds this version's environment. What it installs into the
+# environment (here the yamllint command) is on the action's PATH.
+setup: |
+  uv pip install yamllint==1.35.1
+defaults:
+  timeout_seconds: 60
+actions:
+  - name: lint
+    description: Lint YAML text. Fails when yamllint reports an error.
+    entrypoint: actions/lint.py
+    inputs:
+      type: object
+      properties:
+        content: {type: string, description: "The YAML text to check."}
+        strict: {type: boolean, default: false, description: "Also fail on warnings."}
+      required: [content]
+      additionalProperties: false
+    outputs:
+      type: object
+      properties:
+        ok: {type: boolean}
+        problems: {type: array, items: {type: string}}
+      required: [ok, problems]

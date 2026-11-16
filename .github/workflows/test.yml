@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25.6"
-      - run: pip install pyyaml
+      - run: pip install pyyaml uv
       - name: Run every action with its sample inputs
         run: |
           set -euo pipefail
